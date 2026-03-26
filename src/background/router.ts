@@ -16,18 +16,32 @@ async function navigateTab(tabId: number, url: string): Promise<{ tabId: number;
   return { tabId, url }
 }
 
-export async function handleCommand(message: CommandMessage): Promise<ResultMessage> {
-  const gate = await applyPolicy(message.action)
-  if (!gate.ok) {
-    return {
-      type: "result",
-      requestId: message.requestId,
-      ok: false,
-      error: gate.error,
+async function resolveTargetUrl(action: BrowserAction): Promise<string | undefined> {
+  switch (action.kind) {
+    case "open_tab":
+      return action.url
+    case "navigate_tab":
+      return action.url
+    default: {
+      const tab = await chrome.tabs.get(action.tabId)
+      return tab.url
     }
   }
+}
 
+export async function handleCommand(message: CommandMessage): Promise<ResultMessage> {
   try {
+    const targetUrl = await resolveTargetUrl(message.action)
+    const gate = await applyPolicy(message.action, { targetUrl })
+    if (!gate.ok) {
+      return {
+        type: "result",
+        requestId: message.requestId,
+        ok: false,
+        error: gate.error,
+      }
+    }
+
     let data: unknown
     switch (message.action.kind) {
       case "open_tab":

@@ -2,7 +2,11 @@ import { getPageSnapshot } from "./extract"
 import { executeAction } from "./execute"
 import type { BrowserAction } from "../shared/actions"
 
-chrome.runtime.onMessage.addListener((message: BrowserAction, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((
+  message: BrowserAction,
+  _sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: unknown) => void
+) => {
   if (message.kind === "get_page_snapshot") {
     sendResponse({ ok: true, data: getPageSnapshot() })
     return true

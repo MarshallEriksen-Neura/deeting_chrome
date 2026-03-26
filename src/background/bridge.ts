@@ -1,6 +1,5 @@
 import type { CommandMessage, HelloMessage, ResultMessage } from "../shared/protocol"
-
-const BRIDGE_URL = "ws://127.0.0.1:31937/bridge"
+import { loadSettings, saveBridgeConnectionState } from "./store"
 
 type CommandListener = (message: CommandMessage) => Promise<void> | void
 
@@ -8,8 +7,10 @@ export function connectBridge() {
   let socket: WebSocket | null = null
   const listeners = new Set<CommandListener>()
 
-  const connect = () => {
-    socket = new WebSocket(BRIDGE_URL)
+  const connect = async () => {
+    const settings = await loadSettings()
+    await saveBridgeConnectionState({ status: "connecting" })
+    socket = new WebSocket(settings.bridgeUrl)
 
     socket.onopen = () => {
       const hello: HelloMessage = {
@@ -18,6 +19,7 @@ export function connectBridge() {
         sessionId: crypto.randomUUID(),
         extensionVersion: chrome.runtime.getManifest().version,
       }
+      void saveBridgeConnectionState({ status: "connected" })
       socket?.send(JSON.stringify(hello))
     }
 
@@ -30,11 +32,19 @@ export function connectBridge() {
     }
 
     socket.onclose = () => {
-      setTimeout(connect, 1500)
+      void saveBridgeConnectionState({ status: "idle" })
+      setTimeout(() => void connect(), 1500)
+    }
+
+    socket.onerror = () => {
+      void saveBridgeConnectionState({
+        status: "error",
+        lastError: `Failed to reach ${settings.bridgeUrl}`,
+      })
     }
   }
 
-  connect()
+  void connect()
 
   return {
     onCommand(listener: CommandListener) {
