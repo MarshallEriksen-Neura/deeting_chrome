@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Deeting Browser Agent",
+  "version": "0.1.0",
+  "description": "Bounded browser executor for Deeting desktop-local AI decisions.",
+  "permissions": ["tabs", "scripting", "storage", "activeTab"],
+  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "background": {
+    "service_worker": "dist/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*/*", "http://*/*"],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Deeting Browser Agent"
+  },
+  "options_page": "dist/options.html"
+}

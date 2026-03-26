@@ -1,0 +1,24 @@
+import { getPageSnapshot } from "./extract"
+import { executeAction } from "./execute"
+import type { BrowserAction } from "../shared/actions"
+
+chrome.runtime.onMessage.addListener((message: BrowserAction, _sender, sendResponse) => {
+  if (message.kind === "get_page_snapshot") {
+    sendResponse({ ok: true, data: getPageSnapshot() })
+    return true
+  }
+
+  if (message.kind === "open_tab" || message.kind === "navigate_tab") {
+    sendResponse({
+      ok: false,
+      error: {
+        code: "INVALID_ROUTING",
+        message: `${message.kind} must be handled by background`,
+      },
+    })
+    return true
+  }
+
+  sendResponse(executeAction(message))
+  return true
+})
