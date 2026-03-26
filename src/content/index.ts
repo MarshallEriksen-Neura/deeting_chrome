@@ -1,5 +1,6 @@
 import { getPageSnapshot } from "./extract"
 import { executeAction } from "./execute"
+import { waitForElement } from "./wait"
 import type { BrowserAction } from "../shared/actions"
 
 chrome.runtime.onMessage.addListener((
@@ -9,6 +10,15 @@ chrome.runtime.onMessage.addListener((
 ) => {
   if (message.kind === "get_page_snapshot") {
     sendResponse({ ok: true, data: getPageSnapshot() })
+    return true
+  }
+
+  if (message.kind === "wait_for_element") {
+    void waitForElement(message.target, message.timeoutMs, message.pollIntervalMs).then(
+      (result) => {
+        sendResponse(result)
+      }
+    )
     return true
   }
 

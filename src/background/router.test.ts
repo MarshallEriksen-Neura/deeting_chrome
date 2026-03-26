@@ -16,6 +16,8 @@ const sendMessageMock = mock(async (_tabId: number, _message: unknown) => ({
 const getMock = mock(async (tabId: number) => ({
   id: tabId,
   url: "https://example.com/docs",
+  title: "Docs",
+  status: "complete",
 }))
 
 beforeEach(() => {
@@ -81,6 +83,8 @@ describe("handleCommand", () => {
     getMock.mockImplementationOnce(async (tabId: number) => ({
       id: tabId,
       url: "https://blocked.dev/admin",
+      title: "Blocked",
+      status: "complete",
     }))
 
     const result = await handleCommand({
@@ -91,6 +95,78 @@ describe("handleCommand", () => {
 
     expect(result.ok).toBe(false)
     expect(result.error?.code).toBe("DOMAIN_NOT_ALLOWED")
+    expect(sendMessageMock).toHaveBeenCalledTimes(0)
+  })
+
+  it("waits for navigation until the expected url appears", async () => {
+    let reads = 0
+    getMock.mockImplementation(async (tabId: number) => {
+      reads += 1
+      if (reads === 1) {
+        return {
+          id: tabId,
+          url: "https://example.com/start",
+          title: "Start",
+          status: "loading",
+        }
+      }
+      return {
+        id: tabId,
+        url: "https://example.com/dashboard",
+        title: "Dashboard",
+        status: "complete",
+      }
+    })
+
+    const result = await handleCommand({
+      type: "command",
+      requestId: "req-wait-nav",
+      action: {
+        kind: "wait_for_navigation",
+        tabId: 7,
+        timeoutMs: 200,
+        expectedUrlContains: "/dashboard",
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.data).toEqual({
+      ok: true,
+      url: "https://example.com/dashboard",
+      title: "Dashboard",
+      documentReadyState: "complete",
+      changed: true,
+    })
+    expect(sendMessageMock).toHaveBeenCalledTimes(0)
+  })
+
+  it("times out when navigation does not reach the expected state", async () => {
+    getMock.mockImplementation(async (tabId: number) => ({
+      id: tabId,
+      url: "https://example.com/start",
+      title: "Start",
+      status: "loading",
+    }))
+
+    const result = await handleCommand({
+      type: "command",
+      requestId: "req-wait-nav-timeout",
+      action: {
+        kind: "wait_for_navigation",
+        tabId: 7,
+        timeoutMs: 120,
+        expectedUrlContains: "/dashboard",
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    expect(result.data).toEqual({
+      ok: false,
+      url: "https://example.com/start",
+      title: "Start",
+      documentReadyState: "loading",
+      changed: false,
+    })
     expect(sendMessageMock).toHaveBeenCalledTimes(0)
   })
 })

@@ -1,19 +1,5 @@
 import type { BrowserAction, ElementLocator } from "../shared/actions"
-
-function resolveElement(locator: ElementLocator): HTMLElement | null {
-  if (locator.selector) {
-    const selected = document.querySelector(locator.selector)
-    if (selected instanceof HTMLElement) return selected
-  }
-
-  if (locator.text) {
-    const candidates = [...document.querySelectorAll("button,a,input,label,div,span")]
-    const found = candidates.find((node) => node.textContent?.trim() === locator.text)
-    if (found instanceof HTMLElement) return found
-  }
-
-  return null
-}
+import { isVisible, resolveElement } from "./locate"
 
 export function executeAction(action: Exclude<BrowserAction, { kind: "open_tab" | "navigate_tab" }>) {
   switch (action.kind) {
@@ -42,6 +28,25 @@ export function executeAction(action: Exclude<BrowserAction, { kind: "open_tab" 
       window.scrollBy({ top, behavior: "smooth" })
       return { ok: true }
     }
+    case "scroll_into_view": {
+      const element = resolveElement(action.target)
+      if (!element) {
+        return {
+          ok: false,
+          error: { code: "ELEMENT_NOT_FOUND", message: "scroll target not found" },
+        }
+      }
+      element.scrollIntoView({
+        block:
+          action.align === "start" ||
+          action.align === "center" ||
+          action.align === "end"
+            ? action.align
+            : "nearest",
+        inline: "nearest",
+      })
+      return { ok: true, visible: isVisible(element) }
+    }
     case "query_dom": {
       const matches = action.selector
         ? [...document.querySelectorAll(action.selector)].slice(0, 20)
@@ -56,5 +61,10 @@ export function executeAction(action: Exclude<BrowserAction, { kind: "open_tab" 
     }
     case "get_page_snapshot":
       return { ok: false, error: { code: "INVALID_ROUTING", message: "snapshot action should be handled separately" } }
+    case "wait_for_element":
+      return {
+        ok: false,
+        error: { code: "INVALID_ROUTING", message: "wait action should be handled separately" },
+      }
   }
 }

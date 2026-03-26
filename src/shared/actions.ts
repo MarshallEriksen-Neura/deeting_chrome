@@ -5,6 +5,7 @@ export interface ElementLocator {
   text?: string
   role?: string
   tagName?: string
+  placeholder?: string
   index?: number
 }
 
@@ -26,6 +27,27 @@ export type BrowserAction =
   | { kind: "navigate_tab"; tabId: number; url: string }
   | { kind: "get_page_snapshot"; tabId: number }
   | { kind: "query_dom"; tabId: number; selector?: string; textQuery?: string }
+  | {
+      kind: "wait_for_element"
+      tabId: number
+      target: ElementLocator
+      timeoutMs: number
+      pollIntervalMs: number
+    }
+  | {
+      kind: "wait_for_navigation"
+      tabId: number
+      timeoutMs: number
+      expectedUrlContains?: string
+      expectedTitleContains?: string
+      waitForReadyState?: "loading" | "interactive" | "complete"
+    }
+  | {
+      kind: "scroll_into_view"
+      tabId: number
+      target: ElementLocator
+      align?: "start" | "center" | "end" | "nearest"
+    }
   | { kind: "click"; tabId: number; target: ElementLocator }
   | { kind: "type"; tabId: number; target: ElementLocator; text: string }
   | { kind: "scroll"; tabId: number; direction: "up" | "down"; amount?: number }
