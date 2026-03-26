@@ -1,4 +1,5 @@
 import { loadBridgeConnectionState, loadSettings } from "../background/store"
+import { BRIDGE_ENSURE_CONNECTED_MESSAGE_TYPE } from "../background/bridge"
 
 function escapeHtml(value: string): string {
   return value
@@ -73,6 +74,13 @@ async function main() {
   document.body.style.background = "#dfe7f3"
   document.body.style.overflowX = "hidden"
   app.style.width = `${popupWidth}px`
+
+  await chrome.runtime
+    .sendMessage({
+      type: BRIDGE_ENSURE_CONNECTED_MESSAGE_TYPE,
+      source: "popup",
+    })
+    .catch(() => undefined)
 
   const [settings, bridgeState] = await Promise.all([
     loadSettings(),

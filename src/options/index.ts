@@ -1,4 +1,5 @@
 import { loadSettings, saveSettings } from "../background/store"
+import { BRIDGE_ENSURE_CONNECTED_MESSAGE_TYPE } from "../background/bridge"
 
 function domainsToText(domains: string[]): string {
   return domains.join("\n")
@@ -14,6 +15,13 @@ function textToDomains(value: string): string[] {
 async function main() {
   const app = document.getElementById("app")
   if (!app) return
+
+  await chrome.runtime
+    .sendMessage({
+      type: BRIDGE_ENSURE_CONNECTED_MESSAGE_TYPE,
+      source: "options",
+    })
+    .catch(() => undefined)
 
   const settings = await loadSettings()
 
