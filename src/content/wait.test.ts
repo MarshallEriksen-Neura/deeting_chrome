@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from "bun:test"
-// @ts-expect-error test-only import that reuses the app's existing jsdom dependency
-import { JSDOM } from "../../../../deeting/node_modules/jsdom"
+import { JSDOM } from "jsdom"
 import { waitForElement } from "./wait"
 
 describe("waitForElement", () => {

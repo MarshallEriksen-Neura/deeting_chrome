@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test"
-// @ts-expect-error test-only import that reuses the app's existing jsdom dependency
-import { JSDOM } from "../../../../deeting/node_modules/jsdom"
+import { JSDOM } from "jsdom"
 import { executeAction } from "./execute"
 
 describe("scroll_into_view", () => {
