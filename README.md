@@ -26,3 +26,18 @@ The first milestone is:
 3. Read a structured page snapshot
 4. Execute bounded click/type/scroll actions
 5. Block high-risk actions pending approval
+
+## Release
+
+This repository publishes the extension package from its own GitHub Actions workflow.
+
+- Workflow: `.github/workflows/release.yml`
+- Trigger: push a `v*` tag or run `workflow_dispatch`
+- Guardrail: the release tag must match both `package.json` and `manifest.json`
+- Asset: `deeting-browser-agent-<version>.zip`
+
+The uploaded zip contains the installable extension payload:
+
+- `manifest.json`
+- `assets/`
+- `dist/`

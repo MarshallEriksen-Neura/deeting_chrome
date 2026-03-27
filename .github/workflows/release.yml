@@ -1,0 +1,138 @@
+name: Release Extension
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag to publish (for example: v0.1.0)"
+        required: true
+        type: string
+      source_ref:
+        description: "Git ref to build from. Defaults to the workflow SHA."
+        required: false
+        type: string
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-extension-${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag_name || github.ref_name }}
+      SOURCE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.source_ref || github.sha }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.SOURCE_REF }}
+
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Validate release tag matches extension versions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          release_tag = os.environ["RELEASE_TAG"]
+          expected_version = release_tag[1:] if release_tag.startswith("v") else release_tag
+
+          package_version = json.loads(Path("package.json").read_text(encoding="utf-8"))["version"]
+          manifest_version = json.loads(Path("manifest.json").read_text(encoding="utf-8"))["version"]
+
+          if package_version != manifest_version:
+              raise SystemExit(
+                  f"package.json version {package_version!r} does not match manifest.json version {manifest_version!r}"
+              )
+
+          if expected_version != package_version:
+              raise SystemExit(
+                  f"release tag {release_tag!r} does not match extension version 'v{package_version}'"
+              )
+          PY
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        run: bun test
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build extension
+        run: bun run build
+
+      - name: Package release asset
+        id: package_release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          asset_basename="deeting-browser-agent-${RELEASE_TAG#v}"
+          staging_dir="release/${asset_basename}"
+          asset_path="release/${asset_basename}.zip"
+
+          rm -rf release
+          mkdir -p "${staging_dir}"
+
+          cp manifest.json "${staging_dir}/manifest.json"
+          cp -R assets "${staging_dir}/assets"
+          cp -R dist "${staging_dir}/dist"
+          cp README.md "${staging_dir}/README.md"
+
+          ASSET_BASENAME="${asset_basename}" ASSET_PATH="${asset_path}" python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile
+
+          asset_basename = os.environ["ASSET_BASENAME"]
+          asset_path = Path(os.environ["ASSET_PATH"])
+          root = asset_path.parent / asset_basename
+
+          with ZipFile(asset_path, "w", compression=ZIP_DEFLATED) as archive:
+              for path in sorted(root.rglob("*")):
+                  if path.is_file():
+                      archive.write(path, path.relative_to(asset_path.parent))
+          PY
+
+          echo "asset_path=${asset_path}" >> "$GITHUB_OUTPUT"
+          echo "asset_name=$(basename "${asset_path}")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload packaged artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-release
+          path: ${{ steps.package_release.outputs.asset_path }}
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Ensure GitHub release exists
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            exit 0
+          fi
+
+          gh release create "${RELEASE_TAG}" \
+            --target "${SOURCE_REF}" \
+            --title "Deeting Browser Agent ${RELEASE_TAG}" \
+            --notes "Packaged Chrome extension build for the Deeting desktop browser agent."
+
+      - name: Upload release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${RELEASE_TAG}" "${{ steps.package_release.outputs.asset_path }}" --clobber
