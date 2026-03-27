@@ -4,7 +4,8 @@ import { loadSettings, saveBridgeConnectionState } from "./store"
 
 type CommandListener = (message: CommandMessage) => Promise<void> | void
 
-type RuntimePort = Pick<typeof chrome.runtime, "onMessage">
+type RuntimePort = Pick<typeof chrome.runtime, "onMessage" | "onStartup" | "onInstalled">
+type AlarmPort = Pick<typeof chrome.alarms, "create" | "onAlarm">
 
 interface BridgeSocket {
   onopen: ((event: Event) => void) | null
@@ -24,6 +25,8 @@ interface BridgeConnectionManagerDeps {
   getExtensionVersion: () => string
   scheduleReconnect: (callback: () => void, delayMs: number) => number
   cancelReconnect: (timerId: number) => void
+  scheduleKeepalive: (callback: () => void, delayMs: number) => number
+  cancelKeepalive: (timerId: number) => void
 }
 
 export interface BridgeConnectionManager {
@@ -33,14 +36,17 @@ export interface BridgeConnectionManager {
 }
 
 const RECONNECT_DELAY_MS = 1500
+const KEEPALIVE_INTERVAL_MS = 20_000
 
 export const BRIDGE_ENSURE_CONNECTED_MESSAGE_TYPE = "bridge.ensureConnected"
+export const BRIDGE_RECONNECT_ALARM_NAME = "browser-agent-reconnect"
 
 export function createBridgeConnectionManager(
   deps: BridgeConnectionManagerDeps
 ): BridgeConnectionManager {
   let socket: BridgeSocket | null = null
   let reconnectTimerId: number | null = null
+  let keepaliveTimerId: number | null = null
   let status: BridgeConnectionState["status"] = "idle"
   const listeners = new Set<CommandListener>()
 
@@ -48,6 +54,12 @@ export function createBridgeConnectionManager(
     if (reconnectTimerId === null) return
     deps.cancelReconnect(reconnectTimerId)
     reconnectTimerId = null
+  }
+
+  const clearKeepaliveTimer = () => {
+    if (keepaliveTimerId === null) return
+    deps.cancelKeepalive(keepaliveTimerId)
+    keepaliveTimerId = null
   }
 
   const writeState = async (nextState: Omit<BridgeConnectionState, "updatedAt">) => {
@@ -61,6 +73,22 @@ export function createBridgeConnectionManager(
       reconnectTimerId = null
       void manager.ensureConnected()
     }, RECONNECT_DELAY_MS)
+  }
+
+  const startKeepalive = (targetSocket: BridgeSocket) => {
+    clearKeepaliveTimer()
+    keepaliveTimerId = deps.scheduleKeepalive(() => {
+      if (socket !== targetSocket) {
+        clearKeepaliveTimer()
+        return
+      }
+
+      try {
+        targetSocket.send("keepalive")
+      } catch {
+        clearKeepaliveTimer()
+      }
+    }, KEEPALIVE_INTERVAL_MS)
   }
 
   const manager: BridgeConnectionManager = {
@@ -88,6 +116,7 @@ export function createBridgeConnectionManager(
 
         void writeState({ status: "connected" })
         nextSocket.send(JSON.stringify(hello))
+        startKeepalive(nextSocket)
       }
 
       nextSocket.onmessage = async (event) => {
@@ -104,6 +133,7 @@ export function createBridgeConnectionManager(
       nextSocket.onerror = () => {
         if (socket !== nextSocket) return
 
+        clearKeepaliveTimer()
         void writeState({
           status: "error",
           lastError: `Failed to reach ${settings.bridgeUrl}`,
@@ -115,6 +145,7 @@ export function createBridgeConnectionManager(
           socket = null
         }
 
+        clearKeepaliveTimer()
         void writeState({ status: "idle" })
         scheduleReconnect()
       }
@@ -141,6 +172,9 @@ export function connectBridge(): BridgeConnectionManager {
     getExtensionVersion: () => chrome.runtime.getManifest().version,
     scheduleReconnect: (callback, delayMs) => setTimeout(callback, delayMs) as unknown as number,
     cancelReconnect: (timerId) => clearTimeout(timerId),
+    scheduleKeepalive: (callback, delayMs) =>
+      setInterval(callback, delayMs) as unknown as number,
+    cancelKeepalive: (timerId) => clearInterval(timerId),
   })
 }
 
@@ -168,5 +202,33 @@ export function registerBridgeConnectionWakeHandler(
       })
 
     return true
+  })
+}
+
+export function registerBridgeLifecycleWakeHandlers(
+  bridge: Pick<BridgeConnectionManager, "ensureConnected">,
+  runtime: Pick<typeof chrome.runtime, "onStartup" | "onInstalled"> = chrome.runtime,
+  alarms: AlarmPort = chrome.alarms
+) {
+  const triggerReconnect = () => {
+    void bridge.ensureConnected()
+  }
+
+  alarms.create(BRIDGE_RECONNECT_ALARM_NAME, {
+    delayInMinutes: 1,
+    periodInMinutes: 1,
+  })
+
+  runtime.onStartup.addListener(() => {
+    triggerReconnect()
+  })
+
+  runtime.onInstalled.addListener(() => {
+    triggerReconnect()
+  })
+
+  alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name !== BRIDGE_RECONNECT_ALARM_NAME) return
+    triggerReconnect()
   })
 }

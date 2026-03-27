@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, mock } from "bun:test"
 import {
   BRIDGE_ENSURE_CONNECTED_MESSAGE_TYPE,
   createBridgeConnectionManager,
+  registerBridgeLifecycleWakeHandlers,
   registerBridgeConnectionWakeHandler,
 } from "./bridge"
 import type { BridgeConnectionState } from "./store"
@@ -30,7 +31,8 @@ interface ScheduledTask {
 describe("bridge connection manager", () => {
   const stateWrites: Array<Omit<BridgeConnectionState, "updatedAt">> = []
   const sockets: FakeWebSocket[] = []
-  const scheduledTasks: ScheduledTask[] = []
+  const scheduledReconnects: ScheduledTask[] = []
+  const scheduledKeepalives: ScheduledTask[] = []
   let nextTimerId = 1
 
   function createManager() {
@@ -52,20 +54,37 @@ describe("bridge connection manager", () => {
       getExtensionVersion: () => "0.1.0",
       scheduleReconnect: (callback, delayMs) => {
         const task = { id: nextTimerId++, callback, delayMs }
-        scheduledTasks.push(task)
+        scheduledReconnects.push(task)
         return task.id
       },
       cancelReconnect: (timerId) => {
-        const index = scheduledTasks.findIndex((task) => task.id === timerId)
+        const index = scheduledReconnects.findIndex((task) => task.id === timerId)
         if (index >= 0) {
-          scheduledTasks.splice(index, 1)
+          scheduledReconnects.splice(index, 1)
+        }
+      },
+      scheduleKeepalive: (callback, delayMs) => {
+        const task = { id: nextTimerId++, callback, delayMs }
+        scheduledKeepalives.push(task)
+        return task.id
+      },
+      cancelKeepalive: (timerId) => {
+        const index = scheduledKeepalives.findIndex((task) => task.id === timerId)
+        if (index >= 0) {
+          scheduledKeepalives.splice(index, 1)
         }
       },
     })
   }
 
   function runNextReconnect() {
-    const task = scheduledTasks.shift()
+    const task = scheduledReconnects.shift()
+    expect(task).toBeDefined()
+    task?.callback()
+  }
+
+  function runKeepalive(id: number) {
+    const task = scheduledKeepalives.find((entry) => entry.id === id)
     expect(task).toBeDefined()
     task?.callback()
   }
@@ -73,7 +92,8 @@ describe("bridge connection manager", () => {
   beforeEach(() => {
     stateWrites.length = 0
     sockets.length = 0
-    scheduledTasks.length = 0
+    scheduledReconnects.length = 0
+    scheduledKeepalives.length = 0
     nextTimerId = 1
   })
 
@@ -99,13 +119,13 @@ describe("bridge connection manager", () => {
     sockets[0]?.onclose?.({} as CloseEvent)
 
     expect(stateWrites).toEqual([{ status: "connecting" }, { status: "idle" }])
-    expect(scheduledTasks).toHaveLength(1)
-    expect(scheduledTasks[0]?.delayMs).toBe(1500)
+    expect(scheduledReconnects).toHaveLength(1)
+    expect(scheduledReconnects[0]?.delayMs).toBe(1500)
 
     await manager.ensureConnected()
 
     expect(sockets).toHaveLength(2)
-    expect(scheduledTasks).toHaveLength(0)
+    expect(scheduledReconnects).toHaveLength(0)
     expect(stateWrites).toEqual([
       { status: "connecting" },
       { status: "idle" },
@@ -113,7 +133,7 @@ describe("bridge connection manager", () => {
     ])
 
     sockets[1]?.onclose?.({} as CloseEvent)
-    expect(scheduledTasks).toHaveLength(1)
+    expect(scheduledReconnects).toHaveLength(1)
 
     runNextReconnect()
     await Promise.resolve()
@@ -138,6 +158,33 @@ describe("bridge connection manager", () => {
         lastError: "Failed to reach ws://127.0.0.1:31937/bridge",
       },
     ])
+  })
+
+  it("starts keepalive messages after the websocket opens and stops them after close", async () => {
+    const manager = createManager()
+
+    await manager.ensureConnected()
+    sockets[0]?.onopen?.({} as Event)
+
+    expect(scheduledKeepalives).toHaveLength(1)
+    expect(scheduledKeepalives[0]?.delayMs).toBe(20_000)
+
+    const keepaliveTaskId = scheduledKeepalives[0]!.id
+    runKeepalive(keepaliveTaskId)
+
+    expect(sockets[0]?.sentMessages).toEqual([
+      JSON.stringify({
+        type: "hello",
+        role: "extension",
+        sessionId: "session-1",
+        extensionVersion: "0.1.0",
+      }),
+      "keepalive",
+    ])
+
+    sockets[0]?.onclose?.({} as CloseEvent)
+
+    expect(scheduledKeepalives).toHaveLength(0)
   })
 })
 
@@ -176,5 +223,50 @@ describe("registerBridgeConnectionWakeHandler", () => {
     await Promise.resolve()
     expect(ensureConnected).toHaveBeenCalledTimes(1)
     expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+  })
+})
+
+describe("registerBridgeLifecycleWakeHandlers", () => {
+  it("reconnects on startup, install, and matching alarm events", async () => {
+    let startupListener: (() => void) | undefined
+    let installedListener: (() => void) | undefined
+    let alarmListener: ((alarm: { name: string }) => void) | undefined
+    const runtime = {
+      onStartup: {
+        addListener: mock((listener) => {
+          startupListener = listener
+        }),
+      },
+      onInstalled: {
+        addListener: mock((listener) => {
+          installedListener = listener
+        }),
+      },
+    } as unknown as typeof chrome.runtime
+    const alarms = {
+      create: mock(() => undefined),
+      onAlarm: {
+        addListener: mock((listener) => {
+          alarmListener = listener
+        }),
+      },
+    } as unknown as typeof chrome.alarms
+    const ensureConnected = mock(async () => undefined)
+
+    registerBridgeLifecycleWakeHandlers({ ensureConnected }, runtime, alarms)
+
+    expect(alarms.create).toHaveBeenCalledWith("browser-agent-reconnect", {
+      delayInMinutes: 1,
+      periodInMinutes: 1,
+    })
+
+    startupListener?.()
+    installedListener?.()
+    alarmListener?.({ name: "browser-agent-reconnect" })
+    alarmListener?.({ name: "different-alarm" })
+
+    await Promise.resolve()
+
+    expect(ensureConnected).toHaveBeenCalledTimes(3)
   })
 })
