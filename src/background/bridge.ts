@@ -1,8 +1,17 @@
-import type { CommandMessage, HelloMessage, ResultMessage } from "../shared/protocol"
+import type {
+  BridgeMessage,
+  CommandMessage,
+  EventMessage,
+  HelloMessage,
+  QueryMessage,
+  QueryResultMessage,
+  ResultMessage,
+} from "../shared/protocol"
 import type { BrowserAgentSettings, BridgeConnectionState } from "./store"
 import { loadSettings, saveBridgeConnectionState } from "./store"
 
 type CommandListener = (message: CommandMessage) => Promise<void> | void
+type ConnectedListener = () => Promise<void> | void
 
 type RuntimePort = Pick<typeof chrome.runtime, "onMessage" | "onStartup" | "onInstalled">
 type AlarmPort = Pick<typeof chrome.alarms, "create" | "onAlarm">
@@ -29,10 +38,18 @@ interface BridgeConnectionManagerDeps {
   cancelKeepalive: (timerId: number) => void
 }
 
+interface PendingBridgeQuery {
+  resolve: (message: QueryResultMessage) => void
+  reject: (error: Error) => void
+}
+
 export interface BridgeConnectionManager {
   ensureConnected(): Promise<void>
   onCommand(listener: CommandListener): void
+  onConnected(listener: ConnectedListener): void
   sendResult(message: ResultMessage): void
+  sendEvent(message: EventMessage): void
+  sendQuery(message: QueryMessage): Promise<QueryResultMessage>
 }
 
 const RECONNECT_DELAY_MS = 1500
@@ -49,6 +66,8 @@ export function createBridgeConnectionManager(
   let keepaliveTimerId: number | null = null
   let status: BridgeConnectionState["status"] = "idle"
   const listeners = new Set<CommandListener>()
+  const connectedListeners = new Set<ConnectedListener>()
+  const pendingQueries = new Map<string, PendingBridgeQuery>()
 
   const clearReconnectTimer = () => {
     if (reconnectTimerId === null) return
@@ -117,16 +136,26 @@ export function createBridgeConnectionManager(
         void writeState({ status: "connected" })
         nextSocket.send(JSON.stringify(hello))
         startKeepalive(nextSocket)
+        for (const listener of connectedListeners) {
+          void listener()
+        }
       }
 
       nextSocket.onmessage = async (event) => {
         if (socket !== nextSocket) return
 
-        const payload = JSON.parse(String(event.data)) as CommandMessage
-        if (payload.type !== "command") return
-
-        for (const listener of listeners) {
-          await listener(payload)
+        const payload = JSON.parse(String(event.data)) as BridgeMessage
+        if (payload.type === "command") {
+          for (const listener of listeners) {
+            await listener(payload)
+          }
+          return
+        }
+        if (payload.type === "query_result") {
+          const pending = pendingQueries.get(payload.queryId)
+          if (!pending) return
+          pendingQueries.delete(payload.queryId)
+          pending.resolve(payload)
         }
       }
 
@@ -134,6 +163,10 @@ export function createBridgeConnectionManager(
         if (socket !== nextSocket) return
 
         clearKeepaliveTimer()
+        for (const pending of pendingQueries.values()) {
+          pending.reject(new Error(`Failed to reach ${settings.bridgeUrl}`))
+        }
+        pendingQueries.clear()
         void writeState({
           status: "error",
           lastError: `Failed to reach ${settings.bridgeUrl}`,
@@ -146,6 +179,10 @@ export function createBridgeConnectionManager(
         }
 
         clearKeepaliveTimer()
+        for (const pending of pendingQueries.values()) {
+          pending.reject(new Error("Bridge connection closed"))
+        }
+        pendingQueries.clear()
         void writeState({ status: "idle" })
         scheduleReconnect()
       }
@@ -155,8 +192,45 @@ export function createBridgeConnectionManager(
       listeners.add(listener)
     },
 
+    onConnected(listener: ConnectedListener) {
+      connectedListeners.add(listener)
+    },
+
     sendResult(message: ResultMessage) {
       socket?.send(JSON.stringify(message))
+    },
+
+    sendEvent(message: EventMessage) {
+      socket?.send(JSON.stringify(message))
+    },
+
+    sendQuery(message: QueryMessage) {
+      if (!socket || status !== "connected") {
+        return Promise.reject(new Error("Bridge is not connected"))
+      }
+
+      return new Promise<QueryResultMessage>((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          pendingQueries.delete(message.queryId)
+          reject(new Error("Bridge query timed out"))
+        }, 15_000)
+        pendingQueries.set(message.queryId, {
+          resolve: (response) => {
+            clearTimeout(timeoutId)
+            resolve(response)
+          },
+          reject: (error) => {
+            clearTimeout(timeoutId)
+            reject(error)
+          },
+        })
+        try {
+          socket.send(JSON.stringify(message))
+        } catch (error) {
+          pendingQueries.delete(message.queryId)
+          reject(error instanceof Error ? error : new Error(String(error)))
+        }
+      })
     },
   }
 

@@ -99,6 +99,8 @@ describe("bridge connection manager", () => {
 
   it("writes connecting and connected once and does not create duplicate sockets", async () => {
     const manager = createManager()
+    const connectedListener = mock(() => undefined)
+    manager.onConnected(connectedListener)
 
     await manager.ensureConnected()
     await manager.ensureConnected()
@@ -110,6 +112,7 @@ describe("bridge connection manager", () => {
 
     expect(stateWrites).toEqual([{ status: "connecting" }, { status: "connected" }])
     expect(sockets[0]?.sentMessages).toHaveLength(1)
+    expect(connectedListener).toHaveBeenCalledTimes(1)
   })
 
   it("writes idle on close and reconnects through the scheduled retry without duplicating timers", async () => {
@@ -185,6 +188,81 @@ describe("bridge connection manager", () => {
     sockets[0]?.onclose?.({} as CloseEvent)
 
     expect(scheduledKeepalives).toHaveLength(0)
+  })
+
+  it("sends bridge events through the active websocket", async () => {
+    const manager = createManager()
+
+    await manager.ensureConnected()
+    sockets[0]?.onopen?.({} as Event)
+
+    manager.sendEvent({
+      type: "event",
+      event: "tab_updated",
+      data: {
+        tabId: 42,
+        url: "https://example.com/docs",
+        title: "Example Docs",
+        host: "example.com",
+      },
+    })
+
+    expect(sockets[0]?.sentMessages.at(-1)).toBe(
+      JSON.stringify({
+        type: "event",
+        event: "tab_updated",
+        data: {
+          tabId: 42,
+          url: "https://example.com/docs",
+          title: "Example Docs",
+          host: "example.com",
+        },
+      })
+    )
+  })
+
+  it("resolves pending query results returned from the desktop bridge", async () => {
+    const manager = createManager()
+
+    await manager.ensureConnected()
+    sockets[0]?.onopen?.({} as Event)
+
+    const responsePromise = manager.sendQuery({
+      type: "query",
+      queryId: "query-1",
+      method: "search_wiki",
+      params: {
+        pageContext: {
+          tabId: 42,
+          title: "Example Docs",
+          url: "https://example.com/docs",
+          host: "example.com",
+          headingsSummary: ["Example Docs"],
+          mainTextSnippet: "Main content",
+          visibleTextSnippet: "Visible content",
+        },
+      },
+    })
+
+    sockets[0]?.onmessage?.({
+      data: JSON.stringify({
+        type: "query_result",
+        queryId: "query-1",
+        ok: true,
+        data: {
+          resultCount: 3,
+        },
+      }),
+    } as MessageEvent)
+
+    await expect(responsePromise).resolves.toEqual({
+      type: "query_result",
+      queryId: "query-1",
+      ok: true,
+      data: {
+        resultCount: 3,
+      },
+    })
   })
 })
 

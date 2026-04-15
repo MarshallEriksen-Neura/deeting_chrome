@@ -1,5 +1,9 @@
 import { loadBridgeConnectionState, loadSettings } from "../background/store"
 import { BRIDGE_ENSURE_CONNECTED_MESSAGE_TYPE } from "../background/bridge"
+import {
+  BROWSER_MANUAL_QUERY_MESSAGE_TYPE,
+  type BrowserManualQueryResponse,
+} from "../shared/manual-query"
 
 function escapeHtml(value: string): string {
   return value
@@ -62,6 +66,50 @@ function renderAllowedDomains(domains: string[]): string {
   `
 }
 
+function resultSummary(result: BrowserManualQueryResponse["data"] | undefined): string {
+  const count = typeof result?.resultCount === "number" ? result.resultCount : 0
+  if (result?.kind === "ask_current_page") {
+    return "Current page is ready in Island."
+  }
+  const kind = result?.kind === "search_memory" ? "memory" : "wiki"
+  if (count <= 0) {
+    return `No related ${kind} results were found.`
+  }
+  return `Found ${count} related ${kind} result${count === 1 ? "" : "s"} in Island.`
+}
+
+async function runManualQuery(method: "search_wiki" | "search_memory" | "ask_current_page") {
+  const response = (await chrome.runtime.sendMessage({
+    type: BROWSER_MANUAL_QUERY_MESSAGE_TYPE,
+    method,
+  })) as BrowserManualQueryResponse | undefined
+
+  if (!response?.ok) {
+    throw new Error(response?.error || "Lookup failed")
+  }
+
+  return response.data
+}
+
+async function getActiveTabSummary() {
+  const [tab] = await chrome.tabs.query({
+    active: true,
+    lastFocusedWindow: true,
+  })
+  const title = typeof tab?.title === "string" ? tab.title : "No active page"
+  const url = typeof tab?.url === "string" ? tab.url : ""
+  let host = ""
+  try {
+    host = url ? new URL(url).host : ""
+  } catch {
+    host = ""
+  }
+  return {
+    title,
+    host,
+  }
+}
+
 async function main() {
   const app = document.getElementById("app")
   if (!app) return
@@ -82,9 +130,10 @@ async function main() {
     })
     .catch(() => undefined)
 
-  const [settings, bridgeState] = await Promise.all([
+  const [settings, bridgeState, activeTab] = await Promise.all([
     loadSettings(),
     loadBridgeConnectionState(),
+    getActiveTabSummary(),
   ])
   const iconUrl = chrome.runtime.getURL("assets/icon.png")
   const domainSummary =
@@ -142,6 +191,28 @@ async function main() {
         </div>
       </section>
 
+      <section style="display:grid;gap:12px;padding:16px;border-radius:20px;background:#ffffff;box-shadow:0 14px 30px rgba(15,23,42,0.1);">
+        <div style="display:grid;gap:4px;">
+          <strong style="font-size:14px;color:#0f172a;">Current Page</strong>
+          <span style="font-size:13px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(activeTab.title)}</span>
+          <span style="font-size:12px;color:#64748b;">${escapeHtml(activeTab.host || "No active host")}</span>
+        </div>
+        <div style="display:grid;gap:10px;">
+          <button id="ask-current-page" style="border:none;border-radius:16px;padding:12px 14px;background:linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);box-shadow:0 16px 30px rgba(29,78,216,0.24);color:#ffffff;font-size:14px;font-weight:700;cursor:pointer;">
+            Ask Current Page
+          </button>
+          <button id="search-wiki" style="border:none;border-radius:16px;padding:12px 14px;background:#eff6ff;color:#1d4ed8;font-size:14px;font-weight:700;cursor:pointer;border:1px solid rgba(59,130,246,0.18);">
+            Search Wiki
+          </button>
+          <button id="search-memory" style="border:none;border-radius:16px;padding:12px 14px;background:#eff6ff;color:#1d4ed8;font-size:14px;font-weight:700;cursor:pointer;border:1px solid rgba(59,130,246,0.18);">
+            Search Memory
+          </button>
+        </div>
+        <div id="lookup-status" style="padding:12px 14px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#475569;">
+          Query results will open in the desktop Island.
+        </div>
+      </section>
+
       <button id="open-options" style="border:none;border-radius:16px;padding:13px 14px;background:linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);box-shadow:0 16px 30px rgba(29,78,216,0.24);color:#ffffff;font-size:14px;font-weight:700;cursor:pointer;">
         Open Settings
       </button>
@@ -151,6 +222,41 @@ async function main() {
   document.getElementById("open-options")?.addEventListener("click", () => {
     void chrome.runtime.openOptionsPage()
   })
+
+  const lookupStatus = document.getElementById("lookup-status")
+  const setLookupStatus = (message: string, tone: "neutral" | "error" | "success" = "neutral") => {
+    if (!lookupStatus) return
+    const palette =
+      tone === "error"
+        ? { background: "#fef2f2", color: "#b91c1c", border: "#fecaca" }
+        : tone === "success"
+          ? { background: "#ecfdf5", color: "#166534", border: "#bbf7d0" }
+          : { background: "#f8fafc", color: "#475569", border: "#e2e8f0" }
+    lookupStatus.textContent = message
+    lookupStatus.setAttribute(
+      "style",
+      `padding:12px 14px;border-radius:14px;background:${palette.background};border:1px solid ${palette.border};font-size:12px;line-height:1.6;color:${palette.color};`
+    )
+  }
+
+  const bindLookupButton = (id: string, method: "search_wiki" | "search_memory") => {
+    document.getElementById(id)?.addEventListener("click", async () => {
+      setLookupStatus("Running lookup...", "neutral")
+      try {
+        const result = await runManualQuery(method)
+        setLookupStatus(resultSummary(result), "success")
+      } catch (error) {
+        setLookupStatus(
+          error instanceof Error ? error.message : "Lookup failed",
+          "error"
+        )
+      }
+    })
+  }
+
+  bindLookupButton("ask-current-page", "ask_current_page")
+  bindLookupButton("search-wiki", "search_wiki")
+  bindLookupButton("search-memory", "search_memory")
 }
 
 void main()
