@@ -23,7 +23,7 @@ const _s = (d: string) =>
   `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`
 
 const _ic = (bg: string, svg: string) =>
-  `<div style="width:29px;height:29px;border-radius:7px;background:${bg};display:grid;place-items:center;flex-shrink:0;">${svg}</div>`
+  `<div style="width:29px;height:29px;border-radius:8px;background:${bg};display:grid;place-items:center;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.1);">${svg}</div>`
 
 const IC = {
   link: _ic(C.tint, _s(`<path d="M15 7h3a5 5 0 010 10h-3M9 17H6A5 5 0 016 7h3"/><line x1="8" y1="12" x2="16" y2="12"/>`)),
@@ -59,7 +59,7 @@ async function main() {
   if (!app) return
 
   const FONT = `-apple-system,system-ui,'Helvetica Neue',sans-serif`
-  const CARD = `margin:0 16px;border-radius:12px;background:${C.card};overflow:hidden;`
+  const CARD = `margin:0 16px;border-radius:14px;background:${C.card};overflow:hidden;box-shadow:0 0.5px 1px rgba(0,0,0,0.04),0 2px 6px rgba(0,0,0,0.06);`
   const INPUT = `display:block;width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid ${C.separator};background:${C.bg};font-family:${FONT};font-size:15px;color:${C.label};outline:none;`
 
   await chrome.runtime
@@ -118,7 +118,7 @@ async function main() {
 
         <!-- ─ Save ──────────────────────────────────── -->
         <div style="margin:36px 16px 0;display:flex;align-items:center;gap:16px;">
-          <button type="submit" style="flex:1;border:none;border-radius:12px;padding:14px;background:${C.tint};color:#fff;font-family:${FONT};font-size:17px;font-weight:600;cursor:pointer;letter-spacing:-0.01em;">Save</button>
+          <button type="submit" style="flex:1;border:none;border-radius:14px;padding:14px;background:${C.tint};color:#fff;font-family:${FONT};font-size:17px;font-weight:600;cursor:pointer;letter-spacing:-0.01em;box-shadow:0 4px 14px rgba(0,122,255,0.3);">Save</button>
           <span id="save-status" style="font-size:13px;color:${C.secondary};flex-shrink:0;"></span>
         </div>
       </form>

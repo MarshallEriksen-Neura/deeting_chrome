@@ -1,7 +1,45 @@
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
-export function renderHtmlDocument(title: string, scriptName: string): string {
+type HtmlDocumentSurface = "page" | "popup"
+
+export function renderHtmlDocument(
+  title: string,
+  scriptName: string,
+  surface: HtmlDocumentSurface = "page"
+): string {
+  const popupRadius = 32
+  const shellStyles =
+    surface === "popup"
+      ? `
+      html, body, #app {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        overflow: hidden;
+        border-radius: ${popupRadius}px;
+      }
+      body {
+        color: #000000;
+      }
+      #app {
+        min-height: 0;
+        background: transparent;
+        overflow: hidden;
+        clip-path: inset(0 round ${popupRadius}px);
+      }
+    `
+      : `
+      body {
+        margin: 0;
+        background: #F2F2F7;
+        color: #000000;
+      }
+      #app {
+        min-height: 100vh;
+      }
+    `
+
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -15,14 +53,7 @@ export function renderHtmlDocument(title: string, scriptName: string): string {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
-      body {
-        margin: 0;
-        background: #F2F2F7;
-        color: #000000;
-      }
-      #app {
-        min-height: 100vh;
-      }
+      ${shellStyles}
       button:active {
         opacity: 0.7;
       }
@@ -73,7 +104,7 @@ export async function buildExtension() {
 
   await writeTextFile(
     join(distDir, "popup.html"),
-    renderHtmlDocument("Deeting Browser Agent", "popup/index.js")
+    renderHtmlDocument("Deeting Browser Agent", "popup/index.js", "popup")
   )
   await writeTextFile(
     join(distDir, "options.html"),
