@@ -5,7 +5,7 @@ import {
   type BrowserManualQueryResponse,
 } from "../shared/manual-query"
 
-/* ── iOS System Colors ────────────────────────────────── */
+/* ── iOS Design Tokens ────────────────────────────────── */
 
 const C = {
   bg: "#F2F2F7",
@@ -18,10 +18,31 @@ const C = {
   green: "#34C759",
   orange: "#FF9500",
   red: "#FF3B30",
+  indigo: "#5856D6",
+  purple: "#AF52DE",
   fill: "rgba(120,120,128,0.12)",
 } as const
 
-/* ── Helpers ──────────────────────────────────────────── */
+/* ── Icons (Feather-stroke 15×15 on colored 29×29 rounded squares) ── */
+
+const _s = (d: string) =>
+  `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`
+
+const _ic = (bg: string, svg: string) =>
+  `<div style="width:29px;height:29px;border-radius:7px;background:${bg};display:grid;place-items:center;flex-shrink:0;">${svg}</div>`
+
+const IC = {
+  link: _ic(C.tint, _s(`<path d="M15 7h3a5 5 0 010 10h-3M9 17H6A5 5 0 016 7h3"/><line x1="8" y1="12" x2="16" y2="12"/>`)),
+  clock: _ic(C.green, _s(`<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>`)),
+  doc: _ic(C.indigo, _s(`<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>`)),
+  globe: _ic(C.orange, _s(`<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>`)),
+  shield: _ic(C.purple, _s(`<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>`)),
+  gear: _ic("#8E8E93", `<svg width="14" height="14" viewBox="0 0 20 20" fill="#fff"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>`),
+}
+
+const chevron = `<svg width="7" height="12" viewBox="0 0 7 12" fill="none" style="flex-shrink:0;"><path d="M1 1l5 5-5 5" stroke="rgba(60,60,67,0.3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+
+/* ── Layout Helpers ───────────────────────────────────── */
 
 function escapeHtml(value: string): string {
   return value
@@ -32,13 +53,17 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;")
 }
 
+/** iOS section header — uppercase small caps above a card group */
 function sectionHeader(text: string): string {
-  return `<div style="padding:24px 16px 7px;font-size:13px;font-weight:400;color:${C.secondary};text-transform:uppercase;letter-spacing:-0.01em;">${escapeHtml(text)}</div>`
+  return `<div style="padding:28px 16px 7px;font-size:13px;font-weight:400;color:${C.secondary};text-transform:uppercase;letter-spacing:0.02em;">${escapeHtml(text)}</div>`
 }
 
-function sep(): string {
-  return `<div style="height:0.5px;background:${C.separator};margin-left:16px;"></div>`
+/** Hairline separator inset to align with row text (past the icon) */
+function sep(inset = 57): string {
+  return `<div style="height:0.5px;background:${C.separator};margin-left:${inset}px;"></div>`
 }
+
+/* ── Data Helpers ─────────────────────────────────────── */
 
 function renderStatusIndicator(status: string): string {
   const color =
@@ -52,7 +77,7 @@ function renderStatusIndicator(status: string): string {
 
   const label = status.charAt(0).toUpperCase() + status.slice(1)
 
-  return `<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;background:${C.fill};">
+  return `<div style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;background:${C.fill};">
     <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></span>
     <span style="font-size:13px;font-weight:500;color:${C.secondary};">${escapeHtml(label)}</span>
   </div>`
@@ -70,14 +95,14 @@ function renderDomainPills(domains: string[]): string {
   const visible = domains.slice(0, 4)
   const remaining = domains.length - visible.length
   return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
-    ${visible.map((d) => `<span style="display:inline-flex;padding:4px 10px;border-radius:8px;background:rgba(0,122,255,0.1);color:${C.tint};font-size:13px;font-weight:500;">${escapeHtml(d)}</span>`).join("")}
-    ${remaining > 0 ? `<span style="display:inline-flex;padding:4px 10px;border-radius:8px;background:${C.fill};color:${C.secondary};font-size:13px;font-weight:500;">+${remaining}</span>` : ""}
+    ${visible.map((d) => `<span style="display:inline-flex;padding:3px 9px;border-radius:6px;background:rgba(0,122,255,0.1);color:${C.tint};font-size:12px;font-weight:500;">${escapeHtml(d)}</span>`).join("")}
+    ${remaining > 0 ? `<span style="display:inline-flex;padding:3px 9px;border-radius:6px;background:${C.fill};color:${C.secondary};font-size:12px;font-weight:500;">+${remaining}</span>` : ""}
   </div>`
 }
 
-function renderToggleDisplay(isOn: boolean): string {
+function renderToggle(isOn: boolean): string {
   return `<div style="position:relative;width:51px;height:31px;border-radius:15.5px;background:${isOn ? C.green : "rgba(120,120,128,0.16)"};flex-shrink:0;">
-    <div style="position:absolute;top:2px;${isOn ? "left:22px" : "left:2px"};width:27px;height:27px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.15),0 1px 1px rgba(0,0,0,0.06);"></div>
+    <div style="position:absolute;top:2px;${isOn ? "left:22px" : "left:2px"};width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,0.15),0 0 1px rgba(0,0,0,0.1);"></div>
   </div>`
 }
 
@@ -129,6 +154,7 @@ async function main() {
   if (!app) return
 
   const W = 384
+  const FONT = `-apple-system,system-ui,'Helvetica Neue',sans-serif`
   document.documentElement.style.width = `${W}px`
   document.body.style.width = `${W}px`
   document.body.style.minWidth = `${W}px`
@@ -150,87 +176,103 @@ async function main() {
   const iconUrl = chrome.runtime.getURL("assets/icon.png")
   const updatedAt = formatUpdatedAt(bridgeState.updatedAt)
 
-  const actionBtnStyle = `display:block;width:100%;padding:11px 16px;border:none;background:transparent;font-family:inherit;font-size:15px;color:${C.tint};text-align:center;cursor:pointer;`
+  /* ── Row style constants ─── */
+  const ROW = `padding:11px 16px;display:flex;align-items:center;gap:12px;`
+  const CARD = `margin:0 16px;border-radius:12px;background:${C.card};overflow:hidden;`
+  const ACTION_ROW = `display:block;width:100%;padding:11px 16px;border:none;background:transparent;font-family:${FONT};font-size:15px;color:${C.tint};text-align:center;cursor:pointer;`
 
   app.innerHTML = `
-    <main style="width:${W}px;box-sizing:border-box;padding-bottom:20px;background:${C.bg};font-family:-apple-system,system-ui,'Helvetica Neue',sans-serif;-webkit-font-smoothing:antialiased;">
+    <main style="width:${W}px;box-sizing:border-box;padding-bottom:24px;background:${C.bg};font-family:${FONT};-webkit-font-smoothing:antialiased;">
 
-      <!-- Header -->
+      <!-- ─ Header ────────────────────────────────── -->
       <header style="padding:16px 16px 0;display:flex;align-items:center;gap:12px;">
-        <div style="width:40px;height:40px;border-radius:10px;background:#1C1C1E;display:grid;place-items:center;flex-shrink:0;">
+        <div style="width:42px;height:42px;border-radius:11px;background:linear-gradient(145deg,#1C1C1E,#2C2C2E);display:grid;place-items:center;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,0.12);">
           <img src="${iconUrl}" alt="" width="24" height="24" style="display:block;" />
         </div>
         <div style="flex:1;min-width:0;">
-          <div style="font-size:20px;font-weight:700;color:${C.label};letter-spacing:-0.02em;">Deeting</div>
+          <div style="font-size:20px;font-weight:700;color:${C.label};letter-spacing:-0.03em;">Deeting</div>
           <div style="font-size:13px;color:${C.secondary};margin-top:1px;">Browser Agent</div>
         </div>
         ${renderStatusIndicator(bridgeState.status)}
       </header>
 
-      <!-- Connection -->
+      <!-- ─ Connection ────────────────────────────── -->
       ${sectionHeader("Connection")}
-      <div style="margin:0 16px;border-radius:12px;background:${C.card};overflow:hidden;">
-        <div style="padding:11px 16px;">
-          <div style="font-size:15px;color:${C.label};">Bridge Endpoint</div>
-          <div style="font-size:13px;color:${C.secondary};margin-top:2px;overflow-wrap:anywhere;">${escapeHtml(settings.bridgeUrl)}</div>
+      <div style="${CARD}">
+        <div style="${ROW}">
+          ${IC.link}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;color:${C.label};">Bridge Endpoint</div>
+            <div style="font-size:13px;color:${C.secondary};margin-top:2px;overflow-wrap:anywhere;">${escapeHtml(settings.bridgeUrl)}</div>
+          </div>
         </div>
         ${sep()}
-        <div style="padding:11px 16px;display:flex;align-items:center;justify-content:space-between;">
-          <span style="font-size:15px;color:${C.label};">Last Update</span>
-          <span style="font-size:15px;color:${C.secondary};">${updatedAt ? escapeHtml(updatedAt) : "Waiting\u2026"}</span>
+        <div style="${ROW}">
+          ${IC.clock}
+          <span style="flex:1;font-size:15px;color:${C.label};">Last Update</span>
+          <span style="font-size:15px;color:${C.secondary};flex-shrink:0;">${updatedAt ? escapeHtml(updatedAt) : "Waiting\u2026"}</span>
         </div>
         ${bridgeState.lastError ? `
           ${sep()}
-          <div style="padding:11px 16px;background:rgba(255,59,48,0.05);">
+          <div style="padding:10px 16px 10px 57px;background:rgba(255,59,48,0.05);">
             <div style="font-size:13px;color:${C.red};line-height:1.4;overflow-wrap:anywhere;">${escapeHtml(bridgeState.lastError)}</div>
           </div>
         ` : ""}
       </div>
 
-      <!-- Current Page -->
+      <!-- ─ Current Page ──────────────────────────── -->
       ${sectionHeader("Current Page")}
-      <div style="margin:0 16px;border-radius:12px;background:${C.card};overflow:hidden;">
-        <div style="padding:11px 16px;">
-          <div style="font-size:15px;font-weight:500;color:${C.label};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(activeTab.title)}</div>
-          <div style="font-size:13px;color:${C.secondary};margin-top:2px;">${escapeHtml(activeTab.host || "No active host")}</div>
+      <div style="${CARD}">
+        <div style="${ROW}">
+          ${IC.doc}
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:500;color:${C.label};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(activeTab.title)}</div>
+            <div style="font-size:13px;color:${C.secondary};margin-top:2px;">${escapeHtml(activeTab.host || "No active host")}</div>
+          </div>
         </div>
       </div>
 
-      <!-- Actions -->
-      <div style="margin:8px 16px 0;border-radius:12px;background:${C.card};overflow:hidden;">
-        <button id="ask-current-page" style="${actionBtnStyle}font-weight:500;">Ask Current Page</button>
-        ${sep()}
-        <button id="search-wiki" style="${actionBtnStyle}">Search Wiki</button>
-        ${sep()}
-        <button id="search-memory" style="${actionBtnStyle}">Search Memory</button>
+      <!-- ─ Primary Action ────────────────────────── -->
+      <div style="margin:12px 16px 0;">
+        <button id="ask-current-page" style="display:block;width:100%;padding:13px;border:none;border-radius:12px;background:${C.tint};color:#fff;font-family:${FONT};font-size:15px;font-weight:600;cursor:pointer;letter-spacing:-0.01em;">Ask Current Page</button>
+      </div>
+
+      <!-- ─ Secondary Actions ─────────────────────── -->
+      <div style="${CARD}margin-top:8px;">
+        <button id="search-wiki" style="${ACTION_ROW}">Search Wiki</button>
+        ${sep(16)}
+        <button id="search-memory" style="${ACTION_ROW}">Search Memory</button>
       </div>
       <div id="lookup-status" style="padding:7px 32px 0;font-size:13px;color:${C.secondary};line-height:1.4;">Query results will open in the desktop Island.</div>
 
-      <!-- Security -->
+      <!-- ─ Security ──────────────────────────────── -->
       ${sectionHeader("Security")}
-      <div style="margin:0 16px;border-radius:12px;background:${C.card};overflow:hidden;">
+      <div style="${CARD}">
         <div style="padding:11px 16px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <span style="font-size:15px;color:${C.label};">Allowed Domains</span>
-            <span style="font-size:15px;color:${C.secondary};">${escapeHtml(settings.allowedDomains.length === 0 ? "All" : `${settings.allowedDomains.length} listed`)}</span>
+          <div style="display:flex;align-items:center;gap:12px;">
+            ${IC.globe}
+            <span style="flex:1;font-size:15px;color:${C.label};">Allowed Domains</span>
+            <span style="font-size:15px;color:${C.secondary};flex-shrink:0;">${escapeHtml(settings.allowedDomains.length === 0 ? "All" : `${settings.allowedDomains.length} listed`)}</span>
           </div>
-          ${renderDomainPills(settings.allowedDomains)}
+          ${settings.allowedDomains.length > 0 ? `<div style="padding-left:41px;">${renderDomainPills(settings.allowedDomains)}</div>` : ""}
         </div>
         ${sep()}
-        <div style="padding:11px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div style="${ROW}">
+          ${IC.shield}
           <div style="flex:1;min-width:0;">
             <div style="font-size:15px;color:${C.label};">Low-Risk Auto Approval</div>
             <div style="font-size:13px;color:${C.secondary};margin-top:1px;">${settings.autoApproveLowRisk ? "Enabled" : "Disabled"}</div>
           </div>
-          ${renderToggleDisplay(settings.autoApproveLowRisk)}
+          ${renderToggle(settings.autoApproveLowRisk)}
         </div>
       </div>
 
-      <!-- Settings -->
-      <div style="margin:24px 16px 0;border-radius:12px;background:${C.card};overflow:hidden;">
-        <button id="open-options" style="display:flex;width:100%;padding:11px 16px;border:none;background:transparent;font-family:inherit;font-size:15px;color:${C.tint};align-items:center;justify-content:center;gap:4px;cursor:pointer;">
-          Settings
-          <span style="font-size:17px;color:${C.tertiary};font-weight:300;">\u203A</span>
+      <!-- ─ Settings ──────────────────────────────── -->
+      <div style="${CARD}margin-top:28px;">
+        <button id="open-options" style="display:flex;width:100%;${ROW}border:none;background:transparent;font-family:${FONT};cursor:pointer;">
+          ${IC.gear}
+          <span style="flex:1;font-size:15px;color:${C.label};text-align:left;">Settings</span>
+          ${chevron}
         </button>
       </div>
     </main>
