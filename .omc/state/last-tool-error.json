@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd \\\"d:/20260302170616/Deeting/packages/deeting_chrome\\\" && bunx tsc --noEmit 2>&1\",\"timeout\":30000,\"description\":\"Run TypeScript type checker via bunx\"}",
+  "error": "Exit code 2\nResolving dependencies\nResolved, downloaded and extracted [4]\nSaved lockfile\nerror TS2688: Cannot find type definition file for 'bun-types'.\r\n  The file is in the program because:\r\n    Entry point of type library 'bun-types' specified in compilerOptions\r\nerror TS2688: Cannot find type definition file for 'chrome'.\r\n  The file is in the program because:\r\n    Entry point of type library 'chrome' specified in compilerOptions\r\nerror TS2688: Cannot find type definition file for 'jsdom'.\r\n...",
+  "timestamp": "2026-04-16T00:34:59.119Z",
+  "retry_count": 1
+}

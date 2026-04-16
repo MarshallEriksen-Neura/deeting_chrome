@@ -11,15 +11,24 @@ export function renderHtmlDocument(title: string, scriptName: string): string {
     <style>
       :root {
         color-scheme: light;
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: -apple-system, system-ui, 'Helvetica Neue', 'SF Pro Text', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
       body {
         margin: 0;
-        background: #f5f7fb;
-        color: #1f2937;
+        background: #F2F2F7;
+        color: #000000;
       }
       #app {
         min-height: 100vh;
+      }
+      button:active {
+        opacity: 0.7;
+      }
+      input:focus, textarea:focus {
+        border-color: #007AFF !important;
+        outline: none;
       }
     </style>
   </head>

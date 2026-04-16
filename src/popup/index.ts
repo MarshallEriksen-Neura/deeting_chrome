@@ -5,6 +5,24 @@ import {
   type BrowserManualQueryResponse,
 } from "../shared/manual-query"
 
+/* ── iOS System Colors ────────────────────────────────── */
+
+const C = {
+  bg: "#F2F2F7",
+  card: "#FFFFFF",
+  label: "#000000",
+  secondary: "rgba(60,60,67,0.6)",
+  tertiary: "rgba(60,60,67,0.3)",
+  separator: "rgba(60,60,67,0.12)",
+  tint: "#007AFF",
+  green: "#34C759",
+  orange: "#FF9500",
+  red: "#FF3B30",
+  fill: "rgba(120,120,128,0.12)",
+} as const
+
+/* ── Helpers ──────────────────────────────────────────── */
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -14,56 +32,53 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#39;")
 }
 
-function renderStatusBadge(status: string): string {
-  const palette =
-    status === "connected"
-      ? { background: "#dcfce7", color: "#166534" }
-      : status === "connecting"
-        ? { background: "#fef3c7", color: "#92400e" }
-        : status === "error"
-          ? { background: "#fee2e2", color: "#b91c1c" }
-          : { background: "#e2e8f0", color: "#475569" }
+function sectionHeader(text: string): string {
+  return `<div style="padding:24px 16px 7px;font-size:13px;font-weight:400;color:${C.secondary};text-transform:uppercase;letter-spacing:-0.01em;">${escapeHtml(text)}</div>`
+}
 
-  return `<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:${palette.background};color:${palette.color};font-size:12px;font-weight:700;text-transform:capitalize;"><span style="display:inline-block;width:7px;height:7px;border-radius:999px;background:currentColor;"></span>${escapeHtml(status)}</span>`
+function sep(): string {
+  return `<div style="height:0.5px;background:${C.separator};margin-left:16px;"></div>`
+}
+
+function renderStatusIndicator(status: string): string {
+  const color =
+    status === "connected"
+      ? C.green
+      : status === "connecting"
+        ? C.orange
+        : status === "error"
+          ? C.red
+          : C.tertiary
+
+  const label = status.charAt(0).toUpperCase() + status.slice(1)
+
+  return `<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;background:${C.fill};">
+    <span style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></span>
+    <span style="font-size:13px;font-weight:500;color:${C.secondary};">${escapeHtml(label)}</span>
+  </div>`
 }
 
 function formatUpdatedAt(value: string): string | null {
   if (!value) return null
-
   const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime()) || parsed.getTime() === 0) {
-    return null
-  }
-
+  if (Number.isNaN(parsed.getTime()) || parsed.getTime() === 0) return null
   return parsed.toLocaleString()
 }
 
-function renderAllowedDomains(domains: string[]): string {
-  if (domains.length === 0) {
-    return `<p style="margin:0;font-size:12px;line-height:1.6;color:#475569;">All domains are currently allowed. Add an allowlist in Settings if you want tighter control.</p>`
-  }
+function renderDomainPills(domains: string[]): string {
+  if (domains.length === 0) return ""
+  const visible = domains.slice(0, 4)
+  const remaining = domains.length - visible.length
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+    ${visible.map((d) => `<span style="display:inline-flex;padding:4px 10px;border-radius:8px;background:rgba(0,122,255,0.1);color:${C.tint};font-size:13px;font-weight:500;">${escapeHtml(d)}</span>`).join("")}
+    ${remaining > 0 ? `<span style="display:inline-flex;padding:4px 10px;border-radius:8px;background:${C.fill};color:${C.secondary};font-size:13px;font-weight:500;">+${remaining}</span>` : ""}
+  </div>`
+}
 
-  const visibleDomains = domains.slice(0, 4)
-  const remainingCount = domains.length - visibleDomains.length
-
-  return `
-    <div style="display:flex;flex-wrap:wrap;gap:8px;">
-      ${visibleDomains
-        .map(
-          (domain) => `
-            <span style="display:inline-flex;align-items:center;max-width:100%;padding:6px 10px;border-radius:999px;background:#dbeafe;color:#1d4ed8;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-              ${escapeHtml(domain)}
-            </span>
-          `
-        )
-        .join("")}
-      ${
-        remainingCount > 0
-          ? `<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#e2e8f0;color:#475569;font-size:12px;font-weight:600;">+${remainingCount} more</span>`
-          : ""
-      }
-    </div>
-  `
+function renderToggleDisplay(isOn: boolean): string {
+  return `<div style="position:relative;width:51px;height:31px;border-radius:15.5px;background:${isOn ? C.green : "rgba(120,120,128,0.16)"};flex-shrink:0;">
+    <div style="position:absolute;top:2px;${isOn ? "left:22px" : "left:2px"};width:27px;height:27px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.15),0 1px 1px rgba(0,0,0,0.06);"></div>
+  </div>`
 }
 
 function resultSummary(result: BrowserManualQueryResponse["data"] | undefined): string {
@@ -104,30 +119,26 @@ async function getActiveTabSummary() {
   } catch {
     host = ""
   }
-  return {
-    title,
-    host,
-  }
+  return { title, host }
 }
+
+/* ── Main ─────────────────────────────────────────────── */
 
 async function main() {
   const app = document.getElementById("app")
   if (!app) return
 
-  const popupWidth = 384
-  document.documentElement.style.width = `${popupWidth}px`
-  document.body.style.width = `${popupWidth}px`
-  document.body.style.minWidth = `${popupWidth}px`
+  const W = 384
+  document.documentElement.style.width = `${W}px`
+  document.body.style.width = `${W}px`
+  document.body.style.minWidth = `${W}px`
   document.body.style.margin = "0"
-  document.body.style.background = "#dfe7f3"
+  document.body.style.background = C.bg
   document.body.style.overflowX = "hidden"
-  app.style.width = `${popupWidth}px`
+  app.style.width = `${W}px`
 
   await chrome.runtime
-    .sendMessage({
-      type: BRIDGE_ENSURE_CONNECTED_MESSAGE_TYPE,
-      source: "popup",
-    })
+    .sendMessage({ type: BRIDGE_ENSURE_CONNECTED_MESSAGE_TYPE, source: "popup" })
     .catch(() => undefined)
 
   const [settings, bridgeState, activeTab] = await Promise.all([
@@ -135,89 +146,97 @@ async function main() {
     loadBridgeConnectionState(),
     getActiveTabSummary(),
   ])
+
   const iconUrl = chrome.runtime.getURL("assets/icon.png")
-  const domainSummary =
-    settings.allowedDomains.length === 0
-      ? "Open access"
-      : `${settings.allowedDomains.length} listed`
   const updatedAt = formatUpdatedAt(bridgeState.updatedAt)
 
+  const actionBtnStyle = `display:block;width:100%;padding:11px 16px;border:none;background:transparent;font-family:inherit;font-size:15px;color:${C.tint};text-align:center;cursor:pointer;`
+
   app.innerHTML = `
-    <main style="width:${popupWidth}px;box-sizing:border-box;padding:18px;display:grid;gap:14px;background:linear-gradient(180deg, #f8fafc 0%, #dfe7f3 100%);">
-      <section style="display:grid;gap:14px;padding:16px;border-radius:22px;background:linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(238,242,255,0.98) 45%, rgba(219,234,254,0.98) 100%);box-shadow:0 20px 45px rgba(15,23,42,0.18);">
-        <div style="display:flex;align-items:flex-start;gap:12px;">
-          <div style="display:grid;place-items:center;flex:0 0 auto;width:48px;height:48px;border-radius:16px;background:#0f172a;box-shadow:0 12px 24px rgba(15,23,42,0.18);">
-            <img src="${iconUrl}" alt="Deeting" width="28" height="28" style="display:block;" />
-          </div>
-          <div style="flex:1;min-width:0;display:grid;gap:8px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-              <h1 style="margin:0;font-size:19px;line-height:1.2;color:#0f172a;">Deeting Browser Agent</h1>
-              ${renderStatusBadge(bridgeState.status)}
-            </div>
-            <p style="margin:0;font-size:13px;line-height:1.55;color:#334155;">Desktop-guided browser actions over the localhost bridge, with a bounded execution surface.</p>
-          </div>
-        </div>
+    <main style="width:${W}px;box-sizing:border-box;padding-bottom:20px;background:${C.bg};font-family:-apple-system,system-ui,'Helvetica Neue',sans-serif;-webkit-font-smoothing:antialiased;">
 
-        <div style="display:grid;gap:8px;padding:14px;border-radius:16px;background:rgba(255,255,255,0.88);border:1px solid rgba(148,163,184,0.26);">
-          <span style="font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#64748b;">Bridge Endpoint</span>
-          <div style="font-size:13px;font-weight:700;line-height:1.5;color:#0f172a;overflow-wrap:anywhere;">${escapeHtml(settings.bridgeUrl)}</div>
-          <div style="font-size:12px;color:#475569;">
-            ${
-              updatedAt
-                ? `Last update ${escapeHtml(updatedAt)}`
-                : "Waiting for the desktop bridge to report a live session."
-            }
+      <!-- Header -->
+      <header style="padding:16px 16px 0;display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;border-radius:10px;background:#1C1C1E;display:grid;place-items:center;flex-shrink:0;">
+          <img src="${iconUrl}" alt="" width="24" height="24" style="display:block;" />
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:20px;font-weight:700;color:${C.label};letter-spacing:-0.02em;">Deeting</div>
+          <div style="font-size:13px;color:${C.secondary};margin-top:1px;">Browser Agent</div>
+        </div>
+        ${renderStatusIndicator(bridgeState.status)}
+      </header>
+
+      <!-- Connection -->
+      ${sectionHeader("Connection")}
+      <div style="margin:0 16px;border-radius:12px;background:${C.card};overflow:hidden;">
+        <div style="padding:11px 16px;">
+          <div style="font-size:15px;color:${C.label};">Bridge Endpoint</div>
+          <div style="font-size:13px;color:${C.secondary};margin-top:2px;overflow-wrap:anywhere;">${escapeHtml(settings.bridgeUrl)}</div>
+        </div>
+        ${sep()}
+        <div style="padding:11px 16px;display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:15px;color:${C.label};">Last Update</span>
+          <span style="font-size:15px;color:${C.secondary};">${updatedAt ? escapeHtml(updatedAt) : "Waiting\u2026"}</span>
+        </div>
+        ${bridgeState.lastError ? `
+          ${sep()}
+          <div style="padding:11px 16px;background:rgba(255,59,48,0.05);">
+            <div style="font-size:13px;color:${C.red};line-height:1.4;overflow-wrap:anywhere;">${escapeHtml(bridgeState.lastError)}</div>
           </div>
-          ${
-            bridgeState.lastError
-              ? `<div style="padding:10px 12px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-size:12px;line-height:1.5;overflow-wrap:anywhere;">${escapeHtml(bridgeState.lastError)}</div>`
-              : ""
-          }
-        </div>
-      </section>
+        ` : ""}
+      </div>
 
-      <section style="display:grid;gap:12px;padding:16px;border-radius:20px;background:#ffffff;box-shadow:0 14px 30px rgba(15,23,42,0.1);">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-          <strong style="font-size:14px;color:#0f172a;">Allowed domains</strong>
-          <span style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:#e2e8f0;color:#334155;font-size:12px;font-weight:600;">${escapeHtml(domainSummary)}</span>
+      <!-- Current Page -->
+      ${sectionHeader("Current Page")}
+      <div style="margin:0 16px;border-radius:12px;background:${C.card};overflow:hidden;">
+        <div style="padding:11px 16px;">
+          <div style="font-size:15px;font-weight:500;color:${C.label};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(activeTab.title)}</div>
+          <div style="font-size:13px;color:${C.secondary};margin-top:2px;">${escapeHtml(activeTab.host || "No active host")}</div>
         </div>
-        ${renderAllowedDomains(settings.allowedDomains)}
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;">
-          <div style="display:grid;gap:4px;">
-            <span style="font-size:13px;font-weight:700;color:#0f172a;">Low-risk auto approval</span>
-            <span style="font-size:12px;color:#64748b;">${settings.autoApproveLowRisk ? "Enabled for routine safe actions." : "Every action still requires review."}</span>
+      </div>
+
+      <!-- Actions -->
+      <div style="margin:8px 16px 0;border-radius:12px;background:${C.card};overflow:hidden;">
+        <button id="ask-current-page" style="${actionBtnStyle}font-weight:500;">Ask Current Page</button>
+        ${sep()}
+        <button id="search-wiki" style="${actionBtnStyle}">Search Wiki</button>
+        ${sep()}
+        <button id="search-memory" style="${actionBtnStyle}">Search Memory</button>
+      </div>
+      <div id="lookup-status" style="padding:7px 32px 0;font-size:13px;color:${C.secondary};line-height:1.4;">Query results will open in the desktop Island.</div>
+
+      <!-- Security -->
+      ${sectionHeader("Security")}
+      <div style="margin:0 16px;border-radius:12px;background:${C.card};overflow:hidden;">
+        <div style="padding:11px 16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-size:15px;color:${C.label};">Allowed Domains</span>
+            <span style="font-size:15px;color:${C.secondary};">${escapeHtml(settings.allowedDomains.length === 0 ? "All" : `${settings.allowedDomains.length} listed`)}</span>
           </div>
-          <span style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:${settings.autoApproveLowRisk ? "#dcfce7" : "#fee2e2"};color:${settings.autoApproveLowRisk ? "#166534" : "#b91c1c"};font-size:12px;font-weight:700;">${settings.autoApproveLowRisk ? "On" : "Off"}</span>
+          ${renderDomainPills(settings.allowedDomains)}
         </div>
-      </section>
+        ${sep()}
+        <div style="padding:11px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;color:${C.label};">Low-Risk Auto Approval</div>
+            <div style="font-size:13px;color:${C.secondary};margin-top:1px;">${settings.autoApproveLowRisk ? "Enabled" : "Disabled"}</div>
+          </div>
+          ${renderToggleDisplay(settings.autoApproveLowRisk)}
+        </div>
+      </div>
 
-      <section style="display:grid;gap:12px;padding:16px;border-radius:20px;background:#ffffff;box-shadow:0 14px 30px rgba(15,23,42,0.1);">
-        <div style="display:grid;gap:4px;">
-          <strong style="font-size:14px;color:#0f172a;">Current Page</strong>
-          <span style="font-size:13px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(activeTab.title)}</span>
-          <span style="font-size:12px;color:#64748b;">${escapeHtml(activeTab.host || "No active host")}</span>
-        </div>
-        <div style="display:grid;gap:10px;">
-          <button id="ask-current-page" style="border:none;border-radius:16px;padding:12px 14px;background:linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);box-shadow:0 16px 30px rgba(29,78,216,0.24);color:#ffffff;font-size:14px;font-weight:700;cursor:pointer;">
-            Ask Current Page
-          </button>
-          <button id="search-wiki" style="border:none;border-radius:16px;padding:12px 14px;background:#eff6ff;color:#1d4ed8;font-size:14px;font-weight:700;cursor:pointer;border:1px solid rgba(59,130,246,0.18);">
-            Search Wiki
-          </button>
-          <button id="search-memory" style="border:none;border-radius:16px;padding:12px 14px;background:#eff6ff;color:#1d4ed8;font-size:14px;font-weight:700;cursor:pointer;border:1px solid rgba(59,130,246,0.18);">
-            Search Memory
-          </button>
-        </div>
-        <div id="lookup-status" style="padding:12px 14px;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;font-size:12px;line-height:1.6;color:#475569;">
-          Query results will open in the desktop Island.
-        </div>
-      </section>
-
-      <button id="open-options" style="border:none;border-radius:16px;padding:13px 14px;background:linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);box-shadow:0 16px 30px rgba(29,78,216,0.24);color:#ffffff;font-size:14px;font-weight:700;cursor:pointer;">
-        Open Settings
-      </button>
+      <!-- Settings -->
+      <div style="margin:24px 16px 0;border-radius:12px;background:${C.card};overflow:hidden;">
+        <button id="open-options" style="display:flex;width:100%;padding:11px 16px;border:none;background:transparent;font-family:inherit;font-size:15px;color:${C.tint};align-items:center;justify-content:center;gap:4px;cursor:pointer;">
+          Settings
+          <span style="font-size:17px;color:${C.tertiary};font-weight:300;">\u203A</span>
+        </button>
+      </div>
     </main>
   `
+
+  /* ── Event Listeners ──────────────────────────────────── */
 
   document.getElementById("open-options")?.addEventListener("click", () => {
     void chrome.runtime.openOptionsPage()
@@ -226,22 +245,18 @@ async function main() {
   const lookupStatus = document.getElementById("lookup-status")
   const setLookupStatus = (message: string, tone: "neutral" | "error" | "success" = "neutral") => {
     if (!lookupStatus) return
-    const palette =
-      tone === "error"
-        ? { background: "#fef2f2", color: "#b91c1c", border: "#fecaca" }
-        : tone === "success"
-          ? { background: "#ecfdf5", color: "#166534", border: "#bbf7d0" }
-          : { background: "#f8fafc", color: "#475569", border: "#e2e8f0" }
+    const color =
+      tone === "error" ? C.red : tone === "success" ? C.green : C.secondary
     lookupStatus.textContent = message
     lookupStatus.setAttribute(
       "style",
-      `padding:12px 14px;border-radius:14px;background:${palette.background};border:1px solid ${palette.border};font-size:12px;line-height:1.6;color:${palette.color};`
+      `padding:7px 32px 0;font-size:13px;line-height:1.4;color:${color};`
     )
   }
 
-  const bindLookupButton = (id: string, method: "search_wiki" | "search_memory") => {
+  const bindLookupButton = (id: string, method: "search_wiki" | "search_memory" | "ask_current_page") => {
     document.getElementById(id)?.addEventListener("click", async () => {
-      setLookupStatus("Running lookup...", "neutral")
+      setLookupStatus("Running lookup\u2026", "neutral")
       try {
         const result = await runManualQuery(method)
         setLookupStatus(resultSummary(result), "success")
