@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Deeting Browser Agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minimum_chrome_version": "116",
   "description": "Bounded browser executor for Deeting desktop-local AI decisions.",
   "icons": {
@@ -10,16 +10,30 @@
     "48": "assets/icon.png",
     "128": "assets/icon.png"
   },
-  "permissions": ["tabs", "scripting", "storage", "activeTab", "alarms"],
-  "host_permissions": ["http://127.0.0.1/*", "http://localhost/*"],
+  "permissions": [
+    "tabs",
+    "scripting",
+    "storage",
+    "activeTab",
+    "alarms"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
   "background": {
     "service_worker": "dist/background/index.js",
     "type": "module"
   },
   "content_scripts": [
     {
-      "matches": ["https://*/*", "http://*/*"],
-      "js": ["dist/content/index.js"],
+      "matches": [
+        "https://*/*",
+        "http://*/*"
+      ],
+      "js": [
+        "dist/content/index.js"
+      ],
       "run_at": "document_idle"
     }
   ],
