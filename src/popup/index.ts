@@ -259,7 +259,7 @@ async function main() {
     getActiveTabSummary(),
   ])
 
-  const iconUrl = chrome.runtime.getURL("assets/icon.png")
+  const iconUrl = chrome.runtime.getURL("assets/icon.svg")
   const updatedAt = formatUpdatedAt(bridgeState.updatedAt)
 
   /* ── Row style constants ─── */
@@ -276,9 +276,7 @@ async function main() {
 
       <!-- ─ Header ────────────────────────────────── -->
       <header style="padding:18px 18px 0;display:flex;align-items:center;gap:14px;">
-        <div style="width:50px;height:50px;border-radius:16px;background:linear-gradient(145deg,#1C1C1E,#2C2C2E);display:grid;place-items:center;flex-shrink:0;box-shadow:inset 0 1px 0 rgba(255,255,255,0.12),0 16px 30px rgba(25,25,33,0.18),0 4px 10px rgba(0,0,0,0.1);">
-          <img src="${iconUrl}" alt="" width="24" height="24" style="display:block;" />
-        </div>
+        <img src="${iconUrl}" alt="" width="44" height="44" style="display:block;flex-shrink:0;" />
         <div style="flex:1;min-width:0;">
           <div style="font-size:21px;font-weight:800;color:${C.label};letter-spacing:-0.04em;">Deeting</div>
           <div style="font-size:13px;color:${C.secondary};margin-top:3px;">Browser Agent</div>
