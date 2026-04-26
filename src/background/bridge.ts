@@ -209,6 +209,8 @@ export function createBridgeConnectionManager(
         return Promise.reject(new Error("Bridge is not connected"))
       }
 
+      const activeSocket = socket
+
       return new Promise<QueryResultMessage>((resolve, reject) => {
         const timeoutId = setTimeout(() => {
           pendingQueries.delete(message.queryId)
@@ -225,7 +227,7 @@ export function createBridgeConnectionManager(
           },
         })
         try {
-          socket.send(JSON.stringify(message))
+          activeSocket.send(JSON.stringify(message))
         } catch (error) {
           pendingQueries.delete(message.queryId)
           reject(error instanceof Error ? error : new Error(String(error)))

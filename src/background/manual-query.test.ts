@@ -103,7 +103,7 @@ describe("registerManualBrowserQueryHandler", () => {
       tabId: 42,
     })
     expect(sendQuery).toHaveBeenCalledTimes(1)
-    expect(sendQuery.mock.calls[0]?.[0]).toMatchObject({
+    expect((sendQuery.mock.calls as unknown[][])[0]?.[0]).toMatchObject({
       type: "query",
       method: "search_wiki",
       params: {
@@ -144,7 +144,7 @@ describe("registerManualBrowserQueryHandler", () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(sendQuery.mock.calls.at(-1)?.[0]).toMatchObject({
+    expect((sendQuery.mock.calls as unknown[][])[sendQuery.mock.calls.length - 1]?.[0]).toMatchObject({
       type: "query",
       method: "ask_current_page",
     })
