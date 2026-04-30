@@ -66,3 +66,50 @@ describe("scroll_into_view", () => {
     })
   })
 })
+
+describe("scroll", () => {
+  beforeEach(() => {
+    const dom = new JSDOM(`<!doctype html><html><head></head><body></body></html>`, {
+      url: "https://example.com/",
+    })
+
+    Object.assign(globalThis, {
+      window: dom.window,
+      document: dom.window.document,
+      HTMLElement: dom.window.HTMLElement,
+      HTMLInputElement: dom.window.HTMLInputElement,
+      HTMLTextAreaElement: dom.window.HTMLTextAreaElement,
+      HTMLSelectElement: dom.window.HTMLSelectElement,
+      getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
+    })
+  })
+
+  it("scrolls the page by the requested amount", () => {
+    const scrollByMock = mock(() => undefined)
+    window.scrollBy = scrollByMock as typeof window.scrollBy
+
+    const result = executeAction({
+      kind: "scroll",
+      tabId: 42,
+      direction: "down",
+      amount: 320,
+    })
+
+    expect(result).toEqual({ ok: true })
+    expect(scrollByMock).toHaveBeenCalledWith({ top: 320, behavior: "smooth" })
+  })
+
+  it("defaults to a 600px upward scroll when amount is omitted", () => {
+    const scrollByMock = mock(() => undefined)
+    window.scrollBy = scrollByMock as typeof window.scrollBy
+
+    const result = executeAction({
+      kind: "scroll",
+      tabId: 42,
+      direction: "up",
+    })
+
+    expect(result).toEqual({ ok: true })
+    expect(scrollByMock).toHaveBeenCalledWith({ top: -600, behavior: "smooth" })
+  })
+})
