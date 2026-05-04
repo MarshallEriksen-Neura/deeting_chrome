@@ -9,6 +9,7 @@ import type {
 } from "../shared/protocol"
 import type { BrowserAgentSettings, BridgeConnectionState } from "./store"
 import { loadSettings, saveBridgeConnectionState } from "./store"
+import { SUPPORTED_BROWSER_ACTIONS } from "../shared/actions"
 
 type CommandListener = (message: CommandMessage) => Promise<void> | void
 type ConnectedListener = () => Promise<void> | void
@@ -131,6 +132,8 @@ export function createBridgeConnectionManager(
           role: "extension",
           sessionId: deps.createSessionId(),
           extensionVersion: deps.getExtensionVersion(),
+          schemaVersion: "2026-05-03",
+          supportedActions: SUPPORTED_BROWSER_ACTIONS,
         }
 
         void writeState({ status: "connected" })

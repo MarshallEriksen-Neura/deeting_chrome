@@ -1,4 +1,5 @@
 import type { PageSnapshot } from "../shared/actions"
+import { describeElement, resolveElement } from "./locate"
 
 function textOf(element: Element | null | undefined): string {
   return element?.textContent?.trim() ?? ""
@@ -48,5 +49,72 @@ export function getPageSnapshot(): PageSnapshot {
         action: (node as HTMLFormElement).action || undefined,
         method: (node as HTMLFormElement).method || undefined,
       })),
+    elements: [
+      ...document.querySelectorAll(
+        "a[href],button,input,textarea,select,[role],[aria-label],[data-testid],[data-test],h1,h2,h3"
+      ),
+    ]
+      .filter((node): node is HTMLElement => node instanceof HTMLElement)
+      .slice(0, 300)
+      .map(describeElement),
+  }
+}
+
+export function extractPageContent(action: {
+  mode?: string
+  target?: Parameters<typeof resolveElement>[0]
+  options?: Record<string, unknown>
+}) {
+  const target = action.target ? resolveElement(action.target) : null
+  const root = target ?? document.querySelector("main") ?? document.querySelector("article") ?? document.body
+  const mode = action.mode ?? "summary"
+
+  if (mode === "links") {
+    return {
+      ok: true,
+      mode,
+      links: [...root.querySelectorAll("a[href]")].slice(0, 300).map((node) => ({
+        text: textOf(node),
+        href: (node as HTMLAnchorElement).href,
+      })),
+    }
+  }
+
+  if (mode === "tables") {
+    return {
+      ok: true,
+      mode,
+      tables: [...root.querySelectorAll("table")].slice(0, 20).map((table) => ({
+        text: textOf(table).slice(0, 5000),
+        rows: [...table.querySelectorAll("tr")].slice(0, 100).map((row) =>
+          [...row.querySelectorAll("th,td")].slice(0, 30).map((cell) => textOf(cell))
+        ),
+      })),
+    }
+  }
+
+  if (mode === "metadata") {
+    return {
+      ok: true,
+      mode,
+      title: document.title,
+      url: window.location.href,
+      description:
+        document.querySelector("meta[name='description']")?.getAttribute("content") ??
+        undefined,
+      jsonLd: [...document.querySelectorAll("script[type='application/ld+json']")]
+        .slice(0, 20)
+        .map((node) => node.textContent?.trim() ?? "")
+        .filter(Boolean),
+    }
+  }
+
+  return {
+    ok: true,
+    mode,
+    url: window.location.href,
+    title: document.title,
+    text: textOf(root).slice(0, 20000),
+    target: target ? describeElement(target) : undefined,
   }
 }

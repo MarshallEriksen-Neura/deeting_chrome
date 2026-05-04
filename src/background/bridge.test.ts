@@ -6,6 +6,7 @@ import {
   registerBridgeLifecycleWakeHandlers,
   registerBridgeConnectionWakeHandler,
 } from "./bridge"
+import { SUPPORTED_BROWSER_ACTIONS } from "../shared/actions"
 import type { BridgeConnectionState } from "./store"
 
 class FakeWebSocket {
@@ -181,6 +182,8 @@ describe("bridge connection manager", () => {
         role: "extension",
         sessionId: "session-1",
         extensionVersion: "0.1.0",
+        schemaVersion: "2026-05-03",
+        supportedActions: SUPPORTED_BROWSER_ACTIONS,
       }),
       "keepalive",
     ])

@@ -11,7 +11,19 @@ export interface PolicyDecision {
   }
 }
 
-const HIGH_RISK_ACTIONS = new Set<BrowserAction["kind"]>(["type"])
+const HIGH_RISK_ACTIONS = new Set<BrowserAction["kind"]>([
+  "navigate_tab",
+  "tabs",
+  "click",
+  "type",
+  "fill",
+  "key",
+  "select",
+  "upload_file",
+  "dialog",
+  "storage_write",
+  "eval",
+])
 
 export interface PolicyContext {
   settings?: BrowserAgentSettings
@@ -49,18 +61,6 @@ export async function applyPolicy(
       error: {
         code: "DOMAIN_NOT_ALLOWED",
         message: `Domain is not allowed for action ${action.kind}`,
-      },
-    }
-  }
-
-  if (risk === "high") {
-    return {
-      ok: false,
-      risk,
-      requiresApproval: true,
-      error: {
-        code: "APPROVAL_REQUIRED",
-        message: `Action ${action.kind} requires explicit approval`,
       },
     }
   }

@@ -15,7 +15,8 @@
     "scripting",
     "storage",
     "activeTab",
-    "alarms"
+    "alarms",
+    "downloads"
   ],
   "host_permissions": [
     "http://127.0.0.1/*",

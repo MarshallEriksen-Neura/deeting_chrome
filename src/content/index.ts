@@ -22,7 +22,32 @@ chrome.runtime.onMessage.addListener((
     return true
   }
 
-  if (message.kind === "open_tab" || message.kind === "navigate_tab") {
+  if (message.kind === "wait") {
+    const timeoutMs = message.timeoutMs ?? 10_000
+    const pollIntervalMs = message.pollIntervalMs ?? 100
+    if (message.mode === "element" && message.target) {
+      void waitForElement(message.target, timeoutMs, pollIntervalMs).then((result) => {
+        sendResponse(result)
+      })
+      return true
+    }
+    if (message.mode === "text" && message.text) {
+      void waitForElement({ text: message.text }, timeoutMs, pollIntervalMs).then((result) => {
+        sendResponse(result)
+      })
+      return true
+    }
+  }
+
+  if (
+    message.kind === "open_tab" ||
+    message.kind === "navigate_tab" ||
+    message.kind === "get_active_page" ||
+    message.kind === "tabs" ||
+    message.kind === "downloads" ||
+    message.kind === "full_page_screenshot" ||
+    message.kind === "wait_for_navigation"
+  ) {
     sendResponse({
       ok: false,
       error: {

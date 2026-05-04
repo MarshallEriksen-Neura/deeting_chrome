@@ -28,6 +28,8 @@ export interface HelloMessage {
   role: "desktop" | "extension"
   sessionId: string
   extensionVersion?: string
+  schemaVersion?: string
+  supportedActions?: string[]
 }
 
 export interface CommandMessage {

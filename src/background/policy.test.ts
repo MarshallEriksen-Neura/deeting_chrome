@@ -38,7 +38,7 @@ describe("applyPolicy", () => {
     expect(result.error?.code).toBe("DOMAIN_NOT_ALLOWED")
   })
 
-  it("requires approval for high-risk actions even on allowed domains", async () => {
+  it("allows high-risk actions on allowlisted domains after desktop-side approval", async () => {
     const result = await applyPolicy(
       {
         kind: "type",
@@ -56,8 +56,8 @@ describe("applyPolicy", () => {
       }
     )
 
-    expect(result.ok).toBe(false)
-    expect(result.requiresApproval).toBe(true)
-    expect(result.error?.code).toBe("APPROVAL_REQUIRED")
+    expect(result.ok).toBe(true)
+    expect(result.risk).toBe("high")
+    expect(result.requiresApproval).toBe(false)
   })
 })
