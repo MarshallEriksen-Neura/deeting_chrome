@@ -1,6 +1,6 @@
 {
   "name": "deeting-chrome",
-  "version": "0.1.1.3",
+  "version": "0.1.3",
   "private": true,
   "description": "Chrome extension execution surface for Deeting desktop browser agent",
   "scripts": {
